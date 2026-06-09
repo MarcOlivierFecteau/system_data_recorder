@@ -15,14 +15,17 @@
 #ifndef SDR__SDR_COMPONENT_HPP__
 #define SDR__SDR_COMPONENT_HPP__
 
-#include <atomic>
+#include <condition_variable>
 #include <filesystem>
+#include <mutex>
 #include <queue>
 #include <string>
+#include <thread>
+#include <unordered_map>
 
 #include "sdr/visibility_control.h"
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/node_options.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "rosbag2_cpp/writer.hpp"
 #include "rosbag2_transport/recorder.hpp"
@@ -33,31 +36,29 @@ namespace sdr
 class SystemDataRecorder : public rclcpp_lifecycle::LifecycleNode
 {
 public:
-  /// Constructor
+  /// Constructor.
   ///
-  /// @param node_name The graph name to use for the SDR node
-  /// @param options The options to construct the node with
-  /// @param bag_uri The relative or full path to where the bag will be stored during recording.
-  /// Must not exist.
-  /// @param copy_destination The relative or full path to where the bag files will be copied. Must
-  /// not exist.
-  /// @param max_file_size The maximum size of each individual file in the bag, in bytes. This
-  /// should be tuned based on the time to copy each file, how often the backup files should be
-  /// copied, how fast data is coming in, etc.
-  /// @param topics_and_types A map of topics to record and their types. Keys of the map are topic
-  /// names, values of the map are the topic types, e.g. "example_interfaces/msg/String".
+  /// All recording configuration is supplied through ROS 2 parameters.  The preferred
+  /// way is a YAML config file (default: config/sdr.yaml); individual parameters can
+  /// also be set via ROS 2 CLI arguments (--ros-args -p <name>:=<value>).
+  ///
+  /// Required parameters
+  ///   bags_dir        (string)  – root directory where bags are written
+  ///
+  /// Optional parameters (defaults listed)
+  ///   session_name    (string, "")     – subdirectory/file prefix; defaults to yyyymmdd_HHMMSS
+  ///   storage_type    (string, "mcap") – "mcap" or "sqlite3"
+  ///   max_file_size   (int,    1024)   – maximum bag-file size in MB; 0 = unlimited
+  ///   autostart       (bool,   false)  – trigger CONFIGURE automatically after 1 s
+  ///   copy_bags       (bool,   false)  – copy closed bag files to copy_dir
+  ///   copy_dir        (string, "")     – destination for copies (required when copy_bags=true)
+  ///   topic_names     (string[], ["/parameter_events", "/rosout"])
+  ///   topic_types     (string[], ["rcl_interfaces/msg/ParameterEvent", "rcl_interfaces/msg/Log"])
   SDR_PUBLIC
   SystemDataRecorder(
     const std::string & node_name,
-    const rclcpp::NodeOptions & options,
-    const std::string & bag_uri,
-    const std::string & copy_destination,
-    const unsigned int max_file_size,
-    const std::unordered_map<std::string, std::string> & topics_and_types);
+    const rclcpp::NodeOptions & options);
 
-  /////////////////////////////////////////////////////////////////////////////////////////////////
-  // Lifecycle states
-  /////////////////////////////////////////////////////////////////////////////////////////////////
   SDR_PUBLIC
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
   on_configure(const rclcpp_lifecycle::State & state);
@@ -79,10 +80,6 @@ public:
   on_shutdown(const rclcpp_lifecycle::State & state);
 
 private:
-  /////////////////////////////////////////////////////////////////////////////////////////////////
-  // Variables and functions for the record functionality
-  /////////////////////////////////////////////////////////////////////////////////////////////////
-
   // Options for the bag storage
   rosbag2_storage::StorageOptions storage_options_;
   // The topics that will be recorded, and their types
@@ -103,10 +100,6 @@ private:
   std::string get_serialised_offered_qos_for_topic(const std::string & topic);
   rclcpp::QoS get_appropriate_qos_for_topic(const std::string & topic);
   void unsubscribe_from_topics();
-
-  /////////////////////////////////////////////////////////////////////////////////////////////////
-  // Variables and functions for the file-copying thread and functionality
-  /////////////////////////////////////////////////////////////////////////////////////////////////
 
   // This is used to pass state-change messages from the node to the file-copying worker thread
   enum class SdrStateChange
@@ -144,7 +137,14 @@ private:
   // the writer. So we need to store the name of the final file and copy it during cleanup.
   std::string last_bag_file_ = "";
   // Prevent multiple cleanup
-  bool cleaned_up = true;
+  bool cleaned_up_ = true;
+
+  // Whether to copy closed bag files to a destination directory
+  bool copy_bags_ = false;
+
+  // Ensure a directory exists and is writable; creates it if missing.
+  // Returns true on success, false (and logs an error) on failure.
+  bool ensure_directory_writable(const std::filesystem::path & path);
 
   bool create_copy_destination();
   void copy_bag_file(const std::string & bag_file_name);

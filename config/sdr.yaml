@@ -1,0 +1,41 @@
+# SDR (System Data Recorder) — ROS 2 parameter configuration
+#
+# This file is loaded by default when launching with sdr.launch.py.
+# Override individual values via ROS 2 CLI:
+#   ros2 launch system_data_recorder sdr.launch.py
+#   --ros-args -p bags_dir:=/path/to/bags
+#
+# Or point to a custom config file:
+#   ros2 launch system_data_recorder sdr.launch.py config_file:=/path/to/my_config.yaml
+
+/sdr:
+  ros__parameters:
+    # [REQUIRED] Root directory where bag sessions are written.
+    # Each session creates a subdirectory: <bags_dir>/<session_name>/
+    bags_dir: "/tmp/sdr"
+
+    # Name of the recording session used as the bag subdirectory and file prefix.
+    # Leave empty ("") to use the current timestamp (format: yyyymmdd_HHMMSS).
+    session_name: "test"
+
+    # Storage backend: "mcap" (default) or "sqlite3"
+    storage_type: "mcap"
+
+    # Maximum size of each individual bag file in MB.
+    # When a file reaches this size, a new file is opened automatically.
+    # The files follow the naming pattern <session_name>_0, <session_name>_1, ...
+    # Set to 0 for unlimited file size.
+    max_file_size: 1
+
+    # Trigger the CONFIGURE lifecycle transition automatically 1 second after startup.
+    autostart: true
+
+    # Copy completed bag files to copy_dir as they are closed (i.e. after each split).
+    copy_bags: false
+
+    # Destination directory for bag copies (required when copy_bags is true).
+    copy_dir: ""
+
+    # Topics to record, as an array of "topic_name:message_type" pairs.
+    topics_and_types:
+      - "/chatter:std_msgs/msg/String"
