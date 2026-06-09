@@ -19,22 +19,46 @@
 #include "sdr/sdr_component.hpp"
 
 #include "rclcpp/rclcpp.hpp"
-#include "rosbag2_cpp/writer.hpp"
-#include "rosbag2_transport/recorder.hpp"
+#include "lifecycle_msgs/msg/state.hpp"
+#include "lifecycle_msgs/msg/transition.hpp"
 
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
 
-  auto topics_and_types = std::unordered_map<std::string, std::string>();
-  topics_and_types.insert({"/chatter", "std_msgs/msg/String"});
-  auto sdr_component = std::make_shared<sdr::SystemDataRecorder>(
-    "sdr",
-    rclcpp::NodeOptions(),
-    "test_bag",
-    "copied_bag",
-    100000,
-    topics_and_types);
+  std::shared_ptr<sdr::SystemDataRecorder> sdr_component;
+  try {
+    sdr_component = std::make_shared<sdr::SystemDataRecorder>(
+      "sdr",
+      rclcpp::NodeOptions());
+  } catch (const std::exception & ex) {
+    RCLCPP_FATAL(
+      rclcpp::get_logger("system_data_recorder"),
+      "Failed to create SystemDataRecorder node: %s", ex.what());
+    rclcpp::shutdown();
+    return 1;
+  }
+
+  // One-shot timer: trigger configure after the executor has started
+  // spinning so the node is fully live on the graph before lifecycle transitions.
+  rclcpp::TimerBase::SharedPtr init_timer;
+  if (sdr_component->get_parameter("autostart").as_bool()) {
+    init_timer = sdr_component->create_wall_timer(
+      std::chrono::milliseconds(1000),
+      [&sdr_component, &init_timer]() {
+        init_timer->cancel();  // fire only once
+
+        // Transition: Unconfigured -> Inactive
+        auto configure_result = sdr_component->trigger_transition(
+          lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+        if (configure_result.id() != lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+          RCLCPP_ERROR(
+            sdr_component->get_logger(),
+            "Failed to configure SystemDataRecorder (resulting state id: %u)",
+            configure_result.id());
+        }
+      });
+  }
 
   rclcpp::executors::SingleThreadedExecutor exec;
   exec.add_node(sdr_component->get_node_base_interface());
