@@ -21,7 +21,6 @@
 #include <unistd.h>
 
 #include "lifecycle_msgs/msg/state.hpp"
-#include "rosbag2_storage/topic_metadata.hpp"
 #include "rosbag2_transport/qos.hpp"
 
 namespace sdr
