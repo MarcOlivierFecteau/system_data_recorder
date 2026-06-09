@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <condition_variable>
-#include <mutex>
-#include <thread>
-
 #include "sdr/sdr_component.hpp"
 
-#include "rclcpp/rclcpp.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
 #include "lifecycle_msgs/msg/transition.hpp"
 
