@@ -1,2 +1,4 @@
 # Local files
 .clangd
+config/*.yml
+config/*.yaml
