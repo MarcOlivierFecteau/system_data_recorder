@@ -25,8 +25,6 @@
 // rosbag2_storage.
 #ifdef ROS_DISTRO_HUMBLE
 #include "rosbag2_transport/qos.hpp"
-#else
-#include "rosbag2_storage/qos.hpp"
 #endif
 
 namespace sdr {
