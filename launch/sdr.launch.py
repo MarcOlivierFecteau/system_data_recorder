@@ -7,11 +7,11 @@ from launch import LaunchDescription
 
 
 def generate_launch_description():
-    config_file = LaunchConfiguration("config_file")
+    sdr_config = LaunchConfiguration("sdr_config")
     autostart = LaunchConfiguration("autostart_sdr")
 
-    config_file_cmd = DeclareLaunchArgument(
-        name="config_file",
+    sdr_config_cmd = DeclareLaunchArgument(
+        name="sdr_config",
         default_value=PathJoinSubstitution(
             [FindPackageShare("system_data_recorder"), "config", "sdr.yaml"]
         ),
@@ -37,14 +37,14 @@ def generate_launch_description():
         name="sdr",
         output="screen",
         parameters=[
-            config_file,
+            sdr_config,
             {"autostart": autostart},
         ],
     )
 
     return LaunchDescription(
         [
-            config_file_cmd,
+            sdr_config_cmd,
             autostart_cmd,
             sdr_node,
         ]
