@@ -24,6 +24,14 @@ include_directories(include)
 
 add_library(sdr_component SHARED src/sdr_component.cpp)
 target_compile_definitions(sdr_component PRIVATE "SDR_BUILDING_DLL")
+
+# Detect ROS 2 distribution for API compatibility.
+# In Humble, rosbag2_transport/qos.hpp exists and TopicMetadata.offered_qos_profiles is
+# a YAML string. In Jazzy+, the header was removed (Rosbag2QoS moved to rosbag2_storage)
+# and TopicMetadata.offered_qos_profiles became std::vector<rclcpp::QoS>.
+if("$ENV{ROS_DISTRO}" STREQUAL "humble")
+  target_compile_definitions(sdr_component PRIVATE "ROS_DISTRO_HUMBLE")
+endif()
 ament_target_dependencies(sdr_component
   lifecycle_msgs
   rclcpp

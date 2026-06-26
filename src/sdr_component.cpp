@@ -21,7 +21,13 @@
 #include <unistd.h>
 
 #include "lifecycle_msgs/msg/state.hpp"
+// In Humble, Rosbag2QoS lives in rosbag2_transport. In Jazzy+, it moved to
+// rosbag2_storage.
+#ifdef ROS_DISTRO_HUMBLE
 #include "rosbag2_transport/qos.hpp"
+#else
+#include "rosbag2_storage/qos.hpp"
+#endif
 
 namespace sdr
 {
@@ -265,30 +271,43 @@ void SystemDataRecorder::subscribe_to_topics()
   }
 }
 
-void SystemDataRecorder::subscribe_to_topic(const std::string & topic, const std::string & type)
-{
+void SystemDataRecorder::subscribe_to_topic(const std::string &topic,
+                                            const std::string &type) {
+#ifdef ROS_DISTRO_HUMBLE
+  // In Humble, TopicMetadata.offered_qos_profiles is a YAML string and the
+  // struct has exactly four fields (name, type, serialization_format,
+  // offered_qos_profiles).
   auto offered_qos = get_serialised_offered_qos_for_topic(topic);
   auto qos = get_appropriate_qos_for_topic(topic);
 
   auto topic_metadata = rosbag2_storage::TopicMetadata(
-    {
-      topic,
-      type,
-      rmw_get_serialization_format(),
-      offered_qos
-    }
-  );
+      {topic, type, rmw_get_serialization_format(), offered_qos});
+#else
+  // In Jazzy+, TopicMetadata.offered_qos_profiles is std::vector<rclcpp::QoS>
+  // and the struct has additional fields (id, type_description_hash), so we use
+  // named assignment.
+  auto endpoints = get_publishers_info_by_topic(topic);
+  auto qos = get_appropriate_qos_for_topic(topic);
+
+  rosbag2_storage::TopicMetadata topic_metadata;
+  topic_metadata.name = topic;
+  topic_metadata.type = type;
+  topic_metadata.serialization_format = rmw_get_serialization_format();
+  for (const auto &endpoint : endpoints) {
+    topic_metadata.offered_qos_profiles.push_back(endpoint.qos_profile());
+  }
+#endif
   writer_->create_topic(topic_metadata);
 
   auto subscription = create_generic_subscription(
-    topic,
-    type,
-    qos,
-    [this, topic, type](std::shared_ptr<rclcpp::SerializedMessage> message) {
-      if (get_current_state().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
-        writer_->write(message, topic, type, rclcpp::Clock(RCL_SYSTEM_TIME).now());
-      }
-    });
+      topic, type, qos,
+      [this, topic, type](std::shared_ptr<rclcpp::SerializedMessage> message) {
+        if (get_current_state().id() ==
+            lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
+          writer_->write(message, topic, type,
+                         rclcpp::Clock(RCL_SYSTEM_TIME).now());
+        }
+      });
   if (subscription) {
     subscriptions_.insert({topic, subscription});
     RCLCPP_INFO(get_logger(), "Subscribed to topic '%s'", topic.c_str());
@@ -298,14 +317,23 @@ void SystemDataRecorder::subscribe_to_topic(const std::string & topic, const std
   }
 }
 
-std::string SystemDataRecorder::get_serialised_offered_qos_for_topic(const std::string & topic)
-{
+std::string SystemDataRecorder::get_serialised_offered_qos_for_topic(
+    const std::string &topic) {
+#ifdef ROS_DISTRO_HUMBLE
+  // In Humble, TopicMetadata.offered_qos_profiles is a YAML-serialised string.
   YAML::Node offered_qos_profiles;
   auto endpoints = get_publishers_info_by_topic(topic);
   for (const auto & endpoint : endpoints) {
     offered_qos_profiles.push_back(rosbag2_transport::Rosbag2QoS(endpoint.qos_profile()));
   }
   return YAML::Dump(offered_qos_profiles);
+#else
+  // In Jazzy+, TopicMetadata.offered_qos_profiles is std::vector<rclcpp::QoS>.
+  // This method is not used on Jazzy+; return an empty string to satisfy the
+  // declaration.
+  (void)topic;
+  return "";
+#endif
 }
 
 rclcpp::QoS SystemDataRecorder::get_appropriate_qos_for_topic(const std::string & topic)
