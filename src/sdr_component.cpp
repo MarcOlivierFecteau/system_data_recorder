@@ -46,6 +46,7 @@ SystemDataRecorder::SystemDataRecorder(
   declare_parameter("autostart", false);
   declare_parameter("copy_bags", false);
   declare_parameter("copy_dir", "");
+  declare_parameter("storage_preset_profile", "fastwrite");
   // Each entry encodes a topic/type pair as "topic_name:message_type".
   declare_parameter(
     "topics_and_types",
@@ -153,6 +154,8 @@ SystemDataRecorder::on_configure(const rclcpp_lifecycle::State & /* state */)
     static_cast<uint64_t>(max_file_size_mb) * 1024ULL * 1024ULL;
   // Write cache reduces disk I/O pressure; set to 0 to disable
   storage_options_.max_cache_size = 100ULL * 1024ULL * 1024ULL;
+  storage_options_.storage_preset_profile =
+      get_parameter("storage_preset_profile").as_string();
 
   // Track which file is currently being written (rosbag2 names files _0, _1, …)
   last_bag_file_ = (source_directory_ / (session_name + "_0" + bag_ext)).string();

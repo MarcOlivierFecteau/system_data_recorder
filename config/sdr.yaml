@@ -16,10 +16,11 @@
 
     # Name of the recording session used as the bag subdirectory and file prefix.
     # Leave empty ("") to use the current timestamp (format: yyyymmdd_HHMMSS).
-    session_name: "test"
+    session_name: ""
 
     # Storage backend: "mcap" (default) or "sqlite3"
     storage_type: "mcap"
+    storage_preset_profile: "fastwrite"
 
     # Maximum size of each individual bag file in MB.
     # When a file reaches this size, a new file is opened automatically.
