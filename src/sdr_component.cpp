@@ -42,7 +42,7 @@ SystemDataRecorder::SystemDataRecorder(
   declare_parameter("bags_dir", "");
   declare_parameter("session_name", "");
   declare_parameter("storage_type", "mcap");
-  declare_parameter("max_file_size", int64_t(1024));
+  declare_parameter("max_file_size", int64_t(100));
   declare_parameter("autostart", false);
   declare_parameter("copy_bags", false);
   declare_parameter("copy_dir", "");
@@ -94,8 +94,9 @@ SystemDataRecorder::on_configure(const rclcpp_lifecycle::State & /* state */)
   }
   const std::string bag_ext = (storage_type == "mcap") ? ".mcap" : ".db3";
 
-  // --- max_file_size (MB) ---
-  int64_t max_file_size_mb = get_parameter("max_file_size").as_int() * 1024 * 1024;
+  // --- max_file_size (MB->B) ---
+  int64_t max_file_size_bytes =
+      get_parameter("max_file_size").as_int() * 1024 * 1024;
 
   // --- copy_bags / copy_dir ---
   copy_bags_ = get_parameter("copy_bags").as_bool();
@@ -151,7 +152,7 @@ SystemDataRecorder::on_configure(const rclcpp_lifecycle::State & /* state */)
   storage_options_.uri = source_directory_.string();
   storage_options_.storage_id = storage_type;
   storage_options_.max_bagfile_size =
-    static_cast<uint64_t>(max_file_size_mb) * 1024ULL * 1024ULL;
+      static_cast<uint64_t>(max_file_size_bytes);
   // Write cache reduces disk I/O pressure; set to 0 to disable
   storage_options_.max_cache_size = 100ULL * 1024ULL * 1024ULL;
   storage_options_.storage_preset_profile =
